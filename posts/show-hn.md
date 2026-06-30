@@ -8,7 +8,7 @@ It's deliberately the minimal end of local-first: no backend, no account, no syn
 
 What it does NOT do is half the point: no cloud sync, no gamification, no AI. It shouldn't want anything from you.
 
-Live demo: [LIVE-DEMO]
-Code: [REPO]
+Live demo: https://sirius12-sir.github.io/scanner-cockpit/
+Code: https://github.com/sirius12-sir/scanner-cockpit
 
 I'm honestly less interested in users than in finding the rare person who operates this way — depth across many unrelated domains, held together by infrastructure rather than willpower. If that's you, I'd like to talk.

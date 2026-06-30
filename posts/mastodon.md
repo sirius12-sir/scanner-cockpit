@@ -4,6 +4,6 @@ It's organized around "where was I?" per domain, not the todo list — so re-ent
 
 Less looking for users than for the rare person who works this way — depth in many domains, held by structure not willpower.
 
-[LIVE-DEMO]
+https://sirius12-sir.github.io/scanner-cockpit/
 
 #selfhosting #PKM #buildinpublic

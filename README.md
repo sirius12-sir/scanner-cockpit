@@ -55,7 +55,7 @@ Für jemanden, der mehrere unverwandte Welten gleichzeitig betreibt — mit Tief
 
 Dann interessiert dich an diesem Repo vermutlich nicht das Tool, sondern die Betriebsart dahinter.
 
-Davon gibt es wenige. Ich kenne kaum jemanden, der so arbeitet, und hätte gern jemanden zum Reden — nicht über das Fachthema (Tiefe kann jeder selbst), sondern über das *Wie*: wie man mehrere Domänen auf Niveau hält, ohne sich zu zerlegen. Wenn du das auch tust, mach ein Issue auf oder schreib mir: **[KONTAKT EINTRAGEN]**
+Davon gibt es wenige. Ich kenne kaum jemanden, der so arbeitet, und hätte gern jemanden zum Reden — nicht über das Fachthema (Tiefe kann jeder selbst), sondern über das *Wie*: wie man mehrere Domänen auf Niveau hält, ohne sich zu zerlegen. Wenn du das auch tust, mach ein Issue auf
 
 Kein Verein, keine Community, kein Newsletter. Nur die Möglichkeit, dass sich zwei Leute finden, die dieselbe seltene Sache machen.
 
