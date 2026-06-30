@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>scanner-cockpit</title>
+<style>
+  :root{
+    --bg:#1a1d21;
+    --panel:#22262b;
+    --panel-hi:#272c32;
+    --line:#323840;
+    --line-soft:#2a2f35;
+    --ink:#e9e6df;
+    --ink-dim:#979ca3;
+    --ink-faint:#626972;
+    --amber:#e3a23a;
+    --amber-soft:rgba(227,162,58,.10);
+    --amber-line:rgba(227,162,58,.45);
+    --steel:#708aa1;
+    --radius:3px;
+    --font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-sans);
+    font-size:15px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---- Leiste (Statusbar) ---- */
+  .leiste{
+    position:sticky;top:0;z-index:10;
+    display:flex;align-items:center;gap:18px;
+    padding:11px 20px;
+    background:rgba(26,29,33,.92);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
+  }
+  .marke{
+    font-family:var(--font-mono);
+    font-size:13px;letter-spacing:.04em;
+    color:var(--ink);
+  }
+  .marke b{color:var(--amber);font-weight:600}
+  .status{
+    display:flex;align-items:center;gap:8px;
+    font-family:var(--font-mono);
+    font-size:11.5px;letter-spacing:.02em;
+    color:var(--ink-dim);
+  }
+  .lamp{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--ink-faint);flex:none;
+    transition:background .3s;
+  }
+  .lamp.file{background:var(--amber);box-shadow:0 0 0 3px var(--amber-soft)}
+  .lamp.local{background:var(--steel)}
+  .savestate{color:var(--ink-faint)}
+  .savestate.dirty{color:var(--amber)}
+  .spacer{flex:1}
+  .actions{display:flex;gap:7px;flex-wrap:wrap}
+
+  button{
+    font-family:var(--font-mono);
+    font-size:11.5px;letter-spacing:.03em;
+    color:var(--ink-dim);
+    background:transparent;
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:6px 11px;
+    cursor:pointer;
+    transition:border-color .15s,color .15s,background .15s;
+  }
+  button:hover{color:var(--ink);border-color:var(--ink-faint)}
+  button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  button.prime{color:var(--bg);background:var(--amber);border-color:var(--amber);font-weight:600}
+  button.prime:hover{filter:brightness(1.08);color:var(--bg)}
+
+  /* ---- Raster ---- */
+  .raster{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(310px,1fr));
+    gap:16px;
+    padding:20px;
+    max-width:1500px;margin:0 auto;
+    align-items:start;
+  }
+
+  /* ---- Bereich (Panel) ---- */
+  .bereich{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    border-top:2px solid var(--line);
+    padding:0;
+    display:flex;flex-direction:column;
+    transition:border-color .15s,transform .15s;
+  }
+  .bereich.warm{border-top-color:var(--amber-line)}
+  .bereich:hover{border-color:var(--ink-faint)}
+  @media (hover:hover){.bereich:hover{transform:translateY(-1px)}}
+
+  .kopf{
+    display:flex;align-items:baseline;gap:10px;
+    padding:13px 15px 10px;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .name{
+    font-size:15px;font-weight:600;letter-spacing:.01em;
+    color:var(--ink);
+    background:transparent;border:none;outline:none;
+    flex:1;min-width:0;font-family:var(--font-sans);
+    padding:0;
+  }
+  .name:focus{color:var(--amber)}
+  .zuletzt{
+    font-family:var(--font-mono);font-size:10.5px;
+    color:var(--ink-faint);white-space:nowrap;flex:none;
+    display:flex;align-items:center;gap:6px;
+  }
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--steel);flex:none}
+  .dot.warm{background:var(--amber)}
+
+  /* ---- Faden: die Signatur ---- */
+  .faden{
+    margin:13px 15px;
+    padding:11px 13px 12px;
+    background:var(--amber-soft);
+    border-left:2px solid var(--amber);
+    border-radius:0 var(--radius) var(--radius) 0;
+  }
+  .faden .eyebrow{
+    font-family:var(--font-mono);
+    font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--amber);
+    margin-bottom:6px;
+  }
+  .faden .text{
+    color:var(--ink);font-size:14.5px;line-height:1.45;
+    outline:none;white-space:pre-wrap;word-break:break-word;
+    min-height:1.4em;
+  }
+  .faden .text:empty:before{
+    content:"Wo bist du gerade? Schreib den Faden auf — dann kostet der Wiedereinstieg nichts.";
+    color:var(--ink-faint);font-size:13px;
+  }
+  .faden .text:focus:empty:before{content:""}
+
+  /* ---- Punkte ---- */
+  .punkte{padding:2px 15px 6px}
+  .punkte-eyebrow{
+    font-family:var(--font-mono);
+    font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--ink-faint);
+    margin:6px 0 8px;
+  }
+  .punkt{
+    display:flex;align-items:flex-start;gap:9px;
+    padding:4px 0;
+  }
+  .box{
+    width:14px;height:14px;flex:none;margin-top:3px;
+    border:1.5px solid var(--ink-faint);
+    border-radius:2px;cursor:pointer;
+    background:transparent;
+    transition:border-color .15s,background .15s;
+    position:relative;
+  }
+  .box:hover{border-color:var(--ink-dim)}
+  .box.done{background:var(--amber);border-color:var(--amber)}
+  .box.done:after{
+    content:"";position:absolute;left:3.5px;top:.5px;
+    width:4px;height:8px;border:solid var(--bg);
+    border-width:0 2px 2px 0;transform:rotate(42deg);
+  }
+  .ptext{
+    flex:1;color:var(--ink);font-size:14px;
+    outline:none;word-break:break-word;line-height:1.4;
+  }
+  .punkt.done .ptext{color:var(--ink-faint);text-decoration:line-through}
+  .del{
+    opacity:0;flex:none;border:none;background:none;
+    color:var(--ink-faint);font-family:var(--font-mono);
+    font-size:14px;cursor:pointer;padding:0 2px;line-height:1;
+    transition:opacity .15s,color .15s;
+  }
+  .punkt:hover .del{opacity:1}
+  .del:hover{color:var(--amber)}
+
+  .addpunkt{
+    font-family:var(--font-mono);font-size:11px;
+    color:var(--ink-faint);background:none;border:none;
+    padding:7px 0 12px;cursor:pointer;text-align:left;
+    transition:color .15s;
+  }
+  .addpunkt:hover{color:var(--amber)}
+
+  .bereich-del{
+    align-self:flex-end;margin:0 8px 8px;
+    border:none;background:none;color:var(--ink-faint);
+    font-family:var(--font-mono);font-size:10px;letter-spacing:.05em;
+    cursor:pointer;opacity:0;transition:opacity .15s,color .15s;
+  }
+  .bereich:hover .bereich-del{opacity:.6}
+  .bereich-del:hover{color:var(--amber);opacity:1}
+
+  /* ---- leerer Zustand ---- */
+  .leer{
+    grid-column:1/-1;text-align:center;padding:80px 20px;
+    color:var(--ink-faint);
+  }
+  .leer p{margin:0 0 18px;font-size:15px}
+
+  .fuss{
+    text-align:center;padding:30px 20px 50px;
+    font-family:var(--font-mono);font-size:10.5px;
+    color:var(--ink-faint);letter-spacing:.03em;
+  }
+  .fuss b{color:var(--ink-dim);font-weight:400}
+
+  @media (max-width:560px){
+    .raster{grid-template-columns:1fr;padding:14px}
+    .leiste{gap:12px;padding:10px 14px}
+    .spacer{display:none}
+    .actions{order:3;width:100%}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+  }
+</style>
+</head>
+<body>
+
+<div class="leiste">
+  <span class="marke">scanner&#8209;<b>cockpit</b></span>
+  <span class="status">
+    <span class="lamp" id="lamp"></span>
+    <span id="storeLabel">lokal</span>
+    <span class="savestate" id="saveState">gespeichert</span>
+  </span>
+  <span class="spacer"></span>
+  <div class="actions">
+    <button id="btnOpen">Datei öffnen</button>
+    <button id="btnSave">Speichern</button>
+    <button id="btnSaveAs">Speichern unter…</button>
+    <button id="btnAdd" class="prime">Bereich +</button>
+  </div>
+</div>
+
+<div class="raster" id="raster"></div>
+
+<div class="fuss">
+  ein steuerstand für menschen, die mehrere unverwandte domänen gleichzeitig betreiben &nbsp;·&nbsp;
+  <b>kein backend · eine datei · deine daten</b>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- Modell + Speicher ---------- */
+const LS_KEY = "scanner-cockpit";
+const hasFSA = "showSaveFilePicker" in window;
+let fileHandle = null;
+let state = null;
+let dirty = false;
+let saveTimer = null;
+
+const uid = () =>
+  (crypto.randomUUID ? crypto.randomUUID()
+                     : "id-" + Date.now() + "-" + Math.random().toString(36).slice(2));
+
+function seed(){
+  const mk = (name, faden, punkte, daysAgo) => ({
+    id: uid(), name,
+    faden: { text: faden, ts: Date.now() - daysAgo*864e5 },
+    punkte: punkte.map(t => ({ id: uid(), text: t, erledigt: false })),
+    lastOpened: Date.now() - daysAgo*864e5
+  });
+  return { version: 1, bereiche: [
+    mk("Holz", "Schublade verleimt, in der Zwinge. Morgen ausspannen, Kanten bündig schleifen, dann Scharniere.",
+       ["Schliffpapier 180 nachkaufen","Scharniere bestellen"], 1),
+    mk("Metall", "WIG-Naht am Rahmen halb fertig — die zweite Seite fehlt noch. Argon ist fast leer, vorher tauschen.",
+       ["Argonflasche tauschen","Schweißlinse 1,6 bestellen"], 2),
+    mk("Elektronik", "Sensor-Platine läuft, aber der Pull-up fehlt — deshalb flackert der Eingang. Widerstand einlöten.",
+       ["10k SMD einlöten","Firmware-Flash testen"], 3),
+    mk("Nähen", "Schnittmuster liegt zugeschnitten bereit. Beim nächsten Mal direkt mit der Naht beginnen.",
+       ["Garn in passender Farbe"], 9),
+    mk("Zeichnen", "Perspektivskizze für das Regal — Fluchtpunkt sitzt, jetzt die Maße eintragen.",
+       [], 14),
+    mk("Uhrmacherei", "Werk gereinigt, wartet auf Zusammenbau. Federhaus zuerst, Anker zuletzt.",
+       ["Öl 9010 nachfüllen"], 21),
+  ]};
+}
+
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){ state = JSON.parse(raw); return; }
+  }catch(e){}
+  state = seed();
+  persistLocal();
+}
+
+function persistLocal(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+function markDirty(){
+  dirty = true; updateStatus();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    persistLocal();
+    if(fileHandle) writeToHandle().catch(()=>{});
+    dirty = false; updateStatus();
+  }, 500);
+}
+
+async function writeToHandle(){
+  const w = await fileHandle.createWritable();
+  await w.write(JSON.stringify(state, null, 2));
+  await w.close();
+}
+
+function updateStatus(){
+  const lamp = document.getElementById("lamp");
+  const label = document.getElementById("storeLabel");
+  const save = document.getElementById("saveState");
+  if(fileHandle){
+    lamp.className = "lamp file";
+    label.textContent = fileHandle.name;
+  }else{
+    lamp.className = "lamp local";
+    label.textContent = "lokal (localStorage)";
+  }
+  save.textContent = dirty ? "ungesichert" : "gespeichert";
+  save.className = "savestate" + (dirty ? " dirty" : "");
+}
+
+/* ---------- Datei-Aktionen ---------- */
+async function openFile(){
+  if(hasFSA){
+    try{
+      const [h] = await window.showOpenFilePicker({
+        types:[{description:"Cockpit", accept:{"application/json":[".json"]}}]
+      });
+      fileHandle = h;
+      const f = await h.getFile();
+      state = JSON.parse(await f.text());
+      persistLocal(); render(); updateStatus();
+    }catch(e){ /* abgebrochen */ }
+  }else{
+    const inp = document.createElement("input");
+    inp.type="file"; inp.accept=".json,application/json";
+    inp.onchange = async () => {
+      const f = inp.files[0]; if(!f) return;
+      state = JSON.parse(await f.text());
+      persistLocal(); render(); updateStatus();
+    };
+    inp.click();
+  }
+}
+
+async function saveFile(){
+  if(fileHandle){ await writeToHandle(); dirty=false; updateStatus(); return; }
+  await saveAs();
+}
+
+async function saveAs(){
+  if(hasFSA){
+    try{
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName:"cockpit.json",
+        types:[{description:"Cockpit", accept:{"application/json":[".json"]}}]
+      });
+      await writeToHandle(); dirty=false; updateStatus();
+    }catch(e){ /* abgebrochen */ }
+  }else{
+    const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "cockpit.json"; a.click();
+    URL.revokeObjectURL(a.href);
+  }
+}
+
+/* ---------- Helfer ---------- */
+function relTime(ts){
+  if(!ts) return "—";
+  const d = Math.floor((Date.now()-ts)/864e5);
+  if(d <= 0) return "heute";
+  if(d === 1) return "gestern";
+  if(d < 7) return "vor " + d + " Tagen";
+  if(d < 14) return "vor 1 Woche";
+  if(d < 31) return "vor " + Math.floor(d/7) + " Wochen";
+  return "vor " + Math.floor(d/30) + " Monaten";
+}
+const isWarm = ts => ts && (Date.now()-ts) < 2*864e5;
+
+function touch(b){ b.lastOpened = Date.now(); }
+
+/* ---------- Render ---------- */
+const raster = document.getElementById("raster");
+
+function render(){
+  raster.textContent = "";
+  if(!state.bereiche.length){
+    const e = document.createElement("div");
+    e.className = "leer";
+    const p = document.createElement("p");
+    p.textContent = "Noch keine Bereiche. Leg den ersten an — eine Domäne, die du betreibst.";
+    const btn = document.createElement("button");
+    btn.className="prime"; btn.textContent="Bereich anlegen";
+    btn.onclick = addBereich;
+    e.append(p, btn); raster.append(e);
+    return;
+  }
+  state.bereiche.forEach(b => raster.append(renderBereich(b)));
+}
+
+function renderBereich(b){
+  const warm = isWarm(b.lastOpened);
+  const el = document.createElement("div");
+  el.className = "bereich" + (warm ? " warm" : "");
+
+  /* Kopf */
+  const kopf = document.createElement("div"); kopf.className="kopf";
+  const name = document.createElement("input");
+  name.className="name"; name.value=b.name; name.setAttribute("aria-label","Bereichsname");
+  name.oninput = () => { b.name = name.value; markDirty(); };
+  const zuletzt = document.createElement("span"); zuletzt.className="zuletzt";
+  const dot = document.createElement("span"); dot.className="dot"+(warm?" warm":"");
+  const zt = document.createElement("span"); zt.textContent = relTime(b.lastOpened);
+  zuletzt.append(dot, zt);
+  kopf.append(name, zuletzt);
+
+  /* Faden — die Signatur */
+  const faden = document.createElement("div"); faden.className="faden";
+  const eb = document.createElement("div"); eb.className="eyebrow"; eb.textContent="Faden";
+  const ft = document.createElement("div");
+  ft.className="text"; ft.contentEditable="true"; ft.setAttribute("role","textbox");
+  ft.textContent = b.faden.text || "";
+  ft.onfocus = () => { touch(b); };
+  ft.oninput = () => { b.faden.text = ft.textContent; b.faden.ts = Date.now(); touch(b); markDirty(); };
+  faden.append(eb, ft);
+
+  /* Punkte */
+  const punkte = document.createElement("div"); punkte.className="punkte";
+  const peb = document.createElement("div"); peb.className="punkte-eyebrow"; peb.textContent="offene Punkte";
+  punkte.append(peb);
+  b.punkte.forEach(p => punkte.append(renderPunkt(b,p)));
+  const add = document.createElement("button");
+  add.className="addpunkt"; add.textContent="+ Punkt";
+  add.onclick = () => {
+    b.punkte.push({ id:uid(), text:"", erledigt:false });
+    touch(b); markDirty(); render();
+    const last = raster.querySelector(`[data-b="${b.id}"] .punkt:last-of-type .ptext`);
+    if(last) last.focus();
+  };
+  punkte.append(add);
+
+  /* Bereich löschen */
+  const bd = document.createElement("button");
+  bd.className="bereich-del"; bd.textContent="Bereich entfernen";
+  bd.onclick = () => {
+    if(confirm("Bereich \u201E"+b.name+"\u201C entfernen?")){
+      state.bereiche = state.bereiche.filter(x => x.id !== b.id);
+      markDirty(); render();
+    }
+  };
+
+  el.dataset.b = b.id;
+  el.append(kopf, faden, punkte, bd);
+  return el;
+}
+
+function renderPunkt(b,p){
+  const row = document.createElement("div");
+  row.className = "punkt" + (p.erledigt ? " done" : "");
+  const box = document.createElement("button");
+  box.className = "box" + (p.erledigt ? " done" : "");
+  box.setAttribute("aria-label", p.erledigt ? "Als offen markieren" : "Als erledigt markieren");
+  box.onclick = () => { p.erledigt = !p.erledigt; touch(b); markDirty(); render(); };
+  const txt = document.createElement("div");
+  txt.className="ptext"; txt.contentEditable="true"; txt.setAttribute("role","textbox");
+  txt.textContent = p.text;
+  txt.oninput = () => { p.text = txt.textContent; touch(b); markDirty(); };
+  txt.onkeydown = (e) => {
+    if(e.key==="Enter"){ e.preventDefault(); b.punkte.push({id:uid(),text:"",erledigt:false}); markDirty(); render();
+      const last = raster.querySelector(`[data-b="${b.id}"] .punkt:last-of-type .ptext`); if(last) last.focus(); }
+    if(e.key==="Backspace" && txt.textContent===""){ e.preventDefault();
+      b.punkte = b.punkte.filter(x=>x.id!==p.id); markDirty(); render(); }
+  };
+  const del = document.createElement("button");
+  del.className="del"; del.textContent="×"; del.setAttribute("aria-label","Punkt löschen");
+  del.onclick = () => { b.punkte = b.punkte.filter(x=>x.id!==p.id); touch(b); markDirty(); render(); };
+  row.append(box, txt, del);
+  return row;
+}
+
+function addBereich(){
+  const b = { id:uid(), name:"Neuer Bereich", faden:{text:"",ts:Date.now()}, punkte:[], lastOpened:Date.now() };
+  state.bereiche.unshift(b); markDirty(); render();
+  const n = raster.querySelector(`[data-b="${b.id}"] .name`);
+  if(n){ n.focus(); n.select(); }
+}
+
+/* ---------- Verdrahtung ---------- */
+document.getElementById("btnOpen").onclick = openFile;
+document.getElementById("btnSave").onclick = saveFile;
+document.getElementById("btnSaveAs").onclick = saveAs;
+document.getElementById("btnAdd").onclick = addBereich;
+
+load();
+render();
+updateStatus();
+</script>
+</body>
+</html>
